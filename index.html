@@ -33,6 +33,9 @@
       margin-top: 10px;
       text-align: center;
     }
+    #genbutton{
+      margin: auto 0;
+    }
 
     .qr-history {
       display: flex;
@@ -95,7 +98,7 @@
   
   <div>
     <input type="text" id="input-text" placeholder="QRコードのシードを入力" />
-    <button onclick="generateQRCode()">QRコードを生成</button>
+    <button id="genbutton" onclick="generateQRCode()">QRコードを生成</button>
   </div>
  
 
@@ -148,7 +151,7 @@
     // QRコードを作成し、履歴に追加
     function createQRCode(seed) {
       QRCode.toCanvas(qrCanvas, seed, {
-        width: lastGeneratedQR ? 300 : 500, // 最新QRコードは500pxに設定
+        width: 450, // 最新QRコードは500pxに設定
       }, function(error) {
         if (error) {
           console.error(error);
