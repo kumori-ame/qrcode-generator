@@ -2,66 +2,220 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>QRコード自動生成</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QRコード生成アプリ</title>
   <style>
     body {
-      font-family: sans-serif;
-      text-align: center;
-      margin-top: 50px;
-      background: #f5f5f5;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #f4f4f9;
     }
-    #qrcode {
-      margin: 20px auto;
-      width: fit-content;
-      padding: 20px;
-      background: white;
-      border: 1px solid #ccc;
+
+    #qr-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 20px 0;
     }
-    #text {
+
+    #qr {
+      margin: 10px;
+      border: 2px solid #333;
+    }
+
+    #qr-seed {
       font-size: 18px;
       margin-top: 10px;
+      text-align: center;
+    }
+
+    .qr-history {
+      display: flex;
+      overflow-x: scroll;
+      margin-top: 20px;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      width: 90%;
+    }
+
+    .qr-history div {
+      cursor: pointer;
+      padding: 5px;
+      border: 2px solid transparent;
+    }
+
+    .qr-history div.selected {
+      border-color: red;
+    }
+
+    input[type="text"] {
+      padding: 10px;
+      margin: 10px;
+      font-size: 16px;
+      width: 80%;
+      max-width: 300px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-top: 10px;
+      cursor: pointer;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    .hidden {
+      display: none;
     }
   </style>
 </head>
 <body>
-  <h1>QRコード自動生成</h1>
-  <p>スペースキーで新しいQRコードを生成します</p>
-  <div id="qrcode"></div>
-  <div id="text"></div>
 
-  <!-- QRCode.jsライブラリ読み込み -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <h1>QRコード生成アプリ</h1>
+  
+  <div id="qr-container">
+    <canvas id="qr"></canvas>
+  </div>
+
+  <div id="qr-seed"></div>
+
+  
+  <div>
+    <input type="text" id="input-text" placeholder="QRコードのシードを入力" />
+    <button onclick="generateQRCode()">QRコードを生成</button>
+  </div>
+ 
+
+
+
+  <p>または、スペースキーを押してQRコードを生成</p>
+
+  
+
+  <div class="qr-history" id="qr-history">
+    <!-- 生成したQRコード履歴がここに追加されます -->
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
   <script>
-    const qrcodeContainer = document.getElementById('qrcode');
-    const textContainer = document.getElementById('text');
-    let qr;
+    const qrHistory = [];
+    const maxHistory = 10;
 
-    function generateRandomString(length = 10) {
-      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-      return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-    }
+    const qrContainer = document.getElementById('qr-container');
+    const qrCanvas = document.getElementById('qr');
+    const qrSeedElement = document.getElementById('qr-seed');
 
+
+    const qrHistoryContainer = document.getElementById('qr-history');
+    const inputText = document.getElementById('input-text');
+    
+
+    let lastGeneratedQR = null;
+
+    // QRコードを生成する関数
     function generateQRCode() {
-      const data = generateRandomString(12); // 適当なデータ
-      qrcodeContainer.innerHTML = ''; // 以前のQRを削除
-      qr = new QRCode(qrcodeContainer, {
-        text: data,
-        width: 200,
-        height: 200,
-      });
-      textContainer.textContent = `生成データ: ${data}`;
+      const seed = inputText.value.trim() || generateRandomSeed();
+      createQRCode(seed);
+      inputText.value = ''; // テキストボックスを空にする
     }
 
-    // 初期生成
-    generateQRCode();
+    // より高いランダム性を持つシードを生成
+    function generateRandomSeed() {
+      const array = new Uint32Array(1); // 32ビットの整数を1つ生成
+      window.crypto.getRandomValues(array); // cryptographically secure random number generator
+      return array[0].toString(36); // 36進数で表現
+    }
 
-    // スペースキーで生成
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space') {
-        e.preventDefault(); // スクロール抑止
+    // QRコードを作成し、履歴に追加
+    function createQRCode(seed) {
+      QRCode.toCanvas(qrCanvas, seed, {
+        width: lastGeneratedQR ? 300 : 500, // 最新QRコードは500pxに設定
+      }, function(error) {
+        if (error) {
+          console.error(error);
+        } else {
+          // 最新QRコードは履歴に追加せず、シードを表示
+          displaySeed(seed);
+          addToHistory(seed); // 履歴に追加
+        }
+      });
+    }
+
+    // 最新のQRコードのシードを中央に表示
+    function displaySeed(seed) {
+      // 中央のQRコードの下にシードを表示
+      qrSeedElement.textContent = `シード: ${seed}`;
+      lastGeneratedQR = seed; // 最新のQRコードを記録
+    }
+
+    // 履歴にQRコードを追加する関数
+    function addToHistory(seed) {
+      if (qrHistory.length >= maxHistory) {
+        qrHistory.shift(); // 古いQRコードを削除
+      }
+
+      qrHistory.push(seed);
+
+      // 履歴を表示
+      updateHistory();
+    }
+
+    // 履歴を更新する関数
+    function updateHistory() {
+      qrHistoryContainer.innerHTML = ''; // 履歴リストをクリア
+
+      qrHistory.forEach((seed, index) => {
+        const historyItem = document.createElement('div');
+        historyItem.textContent = seed;
+        historyItem.onclick = () => displayQRFromHistory(index);
+
+        // 直前のQRコードにアウトラインを追加
+        if (index === qrHistory.length - 2) {
+          historyItem.classList.add('selected');
+        }
+
+        qrHistoryContainer.appendChild(historyItem);
+      });
+    }
+
+    // 履歴からQRコードを表示する関数
+    function displayQRFromHistory(index) {
+      const seed = qrHistory[index];
+      QRCode.toCanvas(qrCanvas, seed, {
+        width: 300, // 履歴のQRコードは300pxに設定
+      }, function(error) {
+        if (error) {
+          console.error(error);
+        }
+      });
+    }
+
+    // スペースキーでQRコードを生成
+    document.addEventListener('keydown', (event) => {
+      if (event.code === 'Space') {
+        event.preventDefault();
         generateQRCode();
       }
     });
+
+    // モバイル向けのQRコード生成ボタン
+    document.querySelector('button').addEventListener('click', () => {
+      generateQRCode();
+    });
   </script>
+
 </body>
 </html>
